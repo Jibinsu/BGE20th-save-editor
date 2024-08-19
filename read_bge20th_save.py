@@ -7,42 +7,39 @@ from PyQt5.QtWidgets import (
     QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QInputDialog,
     QSplitter, QStatusBar, QTabWidget, QAction, QTextEdit
 )
-from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QImage
 from PIL import Image
 
 class CBORViewerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("BGE 20th Anniversary Save Editor")  # Updated window title
+        self.setWindowTitle("BGE 20th Anniversary Save Editor")
         self.setGeometry(100, 100, 1000, 700)
 
         self.original_data = None
         self.cbor_data = None
         self.human_readable_data = None
+        self.changes = {}  # Track all changes here
+        self.current_file_path = None
 
         self.init_ui()
 
     def init_ui(self):
-        # Central Widget Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Splitter to separate treeview and image display
         splitter = QSplitter(Qt.Horizontal)
 
-        # Tree widget to display CBOR structure
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Key", "Value"])
         self.tree.itemClicked.connect(self.on_item_clicked)
         self.tree.itemDoubleClicked.connect(self.on_item_double_click)
         splitter.addWidget(self.tree)
 
-        # Tabs for image display and detailed view
         tabs = QTabWidget()
 
-        # Scroll area for image display
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.image_label = QLabel()
@@ -50,7 +47,6 @@ class CBORViewerApp(QMainWindow):
         self.scroll_area.setWidget(self.image_label)
         tabs.addTab(self.scroll_area, "Image Viewer")
 
-        # Tab for detailed view
         self.detail_view = QTextEdit()
         self.detail_view.setReadOnly(True)
         tabs.addTab(self.detail_view, "Details")
@@ -59,11 +55,9 @@ class CBORViewerApp(QMainWindow):
 
         layout.addWidget(splitter)
 
-        # Status Bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
-        # Menu bar
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
 
@@ -80,6 +74,8 @@ class CBORViewerApp(QMainWindow):
             file_path, _ = QFileDialog.getOpenFileName(self, "Select a .sav file", "", "SAV files (*.sav)")
             if not file_path:
                 return
+
+            self.current_file_path = file_path  # Store the current file path
 
             with open(file_path, 'rb') as f:
                 self.original_data = f.read()
@@ -99,7 +95,6 @@ class CBORViewerApp(QMainWindow):
             self.status_bar.showMessage("Failed to load file.", 5000)
 
     def populate_tree(self, data, parent=None):
-        """Populate the tree with CBOR data."""
         if parent is None:
             self.tree.clear()
             parent = self.tree.invisibleRootItem()
@@ -124,9 +119,10 @@ class CBORViewerApp(QMainWindow):
 
     def on_item_clicked(self, item, column):
         """Show details when an item is clicked."""
-        if not isinstance(item.data(0, Qt.UserRole), QPixmap):
-            details = self.get_detailed_information(item)
-            self.detail_view.setText(details)
+        if item:  # Ensure the item is valid
+            if not isinstance(item.data(0, Qt.UserRole), QPixmap):
+                details = self.get_detailed_information(item)
+                self.detail_view.setText(details)
 
     def get_detailed_information(self, item):
         """Retrieve detailed information for the selected item."""
@@ -136,16 +132,9 @@ class CBORViewerApp(QMainWindow):
             item = item.parent()
         keys = list(reversed(keys))
 
-        def get_value(d, keys):
-            for key in keys:
-                if key.startswith("[") and key.endswith("]"):
-                    d = d[int(key[1:-1])]
-                else:
-                    d = d[key]
-            return d
-
-        value = get_value(self.cbor_data, keys)
-        details = f"Key Path: {' > '.join(keys)}\nValue: {value}"
+        value = self.get_value(self.cbor_data, keys)
+        value_type = type(value).__name__
+        details = f"Key Path: {' > '.join(keys)}\nValue: {value}\nType: {value_type}"
 
         if isinstance(value, (dict, list)):
             details += f"\n\nExpanded View:\n{value}"
@@ -154,70 +143,121 @@ class CBORViewerApp(QMainWindow):
 
     def on_item_double_click(self, item, column):
         """Handle double-clicks to edit or view items."""
-        if isinstance(item.data(0, Qt.UserRole), QPixmap):
-            pixmap = item.data(0, Qt.UserRole)
-            self.image_label.setPixmap(pixmap)
-            self.status_bar.showMessage("Image displayed.", 5000)
-        else:
-            current_value = item.text(1)
-            new_value, ok = QInputDialog.getText(self, "Edit Value", "New Value:", text=current_value)
-            if ok and new_value != current_value:
-                item.setText(1, new_value)
-                self.update_cbor_data(item, new_value)
-                self.status_bar.showMessage("Value updated.", 5000)
-
-    def update_cbor_data(self, item, new_value):
-        """Update the CBOR data structure based on the treeview changes."""
-        keys = []
-        while item is not None:
-            keys.append(item.text(0))
-            item = item.parent()
-        keys = list(reversed(keys))
-
-        def set_value(d, keys, value):
-            for key in keys[:-1]:
-                if key.startswith("[") and key.endswith("]"):
-                    d = d[int(key[1:-1])]
-                else:
-                    d = d[key]
-            if keys[-1].startswith("[") and keys[-1].endswith("]"):
-                d[int(keys[-1][1:-1])] = value
+        if item:  # Ensure the item is valid
+            if isinstance(item.data(0, Qt.UserRole), QPixmap):
+                pixmap = item.data(0, Qt.UserRole)
+                self.image_label.setPixmap(pixmap)
+                self.status_bar.showMessage("Image displayed.", 5000)
             else:
-                d[keys[-1]] = value
+                current_value = item.text(1)
+                current_details = self.get_detailed_information(item)
+                value_type = current_details.split('Type: ')[1].strip()
+                new_value, ok = QInputDialog.getText(self, "Edit Value", f"New Value (Type: {value_type}):", text=current_value)
+                if ok and new_value != current_value:
+                    item.setText(1, new_value)
+                    self.update_cbor_data(item, new_value, value_type)
+                    self.status_bar.showMessage("Value updated.", 5000)
 
-        set_value(self.cbor_data, keys, new_value)
+    def get_value(self, d, keys):
+        """Retrieve value from nested dictionary using a list of keys."""
+        for key in keys:
+            if key.startswith("[") and key.endswith("]"):
+                d = d[int(key[1:-1])]
+            else:
+                d = d[key]
+        return d
+
+    def update_cbor_data(self, item, new_value, value_type):
+        if item:  # Ensure the item is valid
+            keys = []
+            while item is not None:
+                keys.append(item.text(0))
+                item = item.parent()
+            keys = list(reversed(keys))
+
+            def set_value(d, keys, value):
+                for key in keys[:-1]:
+                    if key.startswith("[") and key.endswith("]"):
+                        d = d[int(key[1:-1])]
+                    else:
+                        d = d[key]
+
+                if keys[-1].startswith("[") and keys[-1].endswith("]"):
+                    original_value = d[int(keys[-1][1:-1])]
+                    d[int(keys[-1][1:-1])] = self.cast_to_correct_type(value, value_type)
+                else:
+                    original_value = d[keys[-1]]
+                    d[keys[-1]] = self.cast_to_correct_type(value, value_type)
+
+            self.changes[tuple(keys)] = {"original": self.get_value(self.cbor_data, keys), "new": new_value, "type": value_type}
+            set_value(self.cbor_data, keys, new_value)
+
+    def cast_to_correct_type(self, value, value_type):
+        try:
+            if value_type == 'int':
+                return int(value)
+            elif value_type == 'float':
+                return float(value)
+            elif value_type == 'bool':
+                return value.lower() in ['true', '1']
+            else:
+                return str(value)
+        except ValueError:
+            return value
 
     def save_changes(self):
         try:
-            if self.cbor_data:
-                reserialized_cbor = cbor2.dumps(self.cbor_data)
-                new_data = (
-                    self.original_data[:26] + reserialized_cbor + self.original_data[-1:]
-                )
+            if not self.changes:
+                QMessageBox.information(self, "No Changes", "No user-made changes to save.")
+                return
 
-                self.original_data = new_data
+            # Open the original file data
+            with open(self.current_file_path, 'rb') as f:
+                original_file_data = f.read()
 
-                QMessageBox.information(self, "Success", "Data successfully reserialized in memory.")
-                self.status_bar.showMessage("Changes saved successfully.", 5000)
+            # Apply only the changes from self.changes dictionary
+            for keys, change in self.changes.items():
+                original_value = change["original"]
+                new_value = change["new"]
+                value_type = change["type"]
+
+                original_bytes = cbor2.dumps(original_value)
+                new_bytes = cbor2.dumps(self.cast_to_correct_type(new_value, value_type))
+
+                index = original_file_data.find(original_bytes)
+
+                if index != -1:
+                    original_file_data = original_file_data[:index] + new_bytes + original_file_data[index + len(original_bytes):]
+
+            # Update dump size (recalculate based on modified data)
+            new_cbor_data = original_file_data[26:-1]  # The new CBOR data section
+            new_dump_size = len(new_cbor_data)  # Calculate the new dump size based on CBOR section
+            new_dump_size_hex = f'{new_dump_size:08x}'.encode('ascii')  # Convert to hex and encode to ASCII
+
+            # Rebuild the original data with updated dump size
+            original_file_data = (
+                original_file_data[:8]  # Signature part
+                + new_dump_size_hex  # Updated dump size
+                + original_file_data[16:]  # Rest of the file
+            )
+
+            # Write the updated data back to the file
+            with open(self.current_file_path, 'wb') as f:
+                f.write(original_file_data)
+
+            self.status_bar.showMessage("Changes saved successfully.", 5000)
+            QMessageBox.information(self, "Success", "Data successfully saved to file.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save changes: {e}")
             self.status_bar.showMessage("Failed to save changes.", 5000)
 
-def hex_ascii_display(data):
-    hex_data = binascii.hexlify(data).decode('utf-8')
-    ascii_data = ''.join([chr(byte) if 32 <= byte < 127 else '.' for byte in data])
-
-    hex_dump = ""
-    ascii_dump = ""
-
-    for i in range(0, len(hex_data), 32):
-        hex_chunk = hex_data[i:i + 32]
-        ascii_chunk = ascii_data[i // 2:(i // 2) + (len(hex_chunk) // 2)]
-        hex_dump += f"{hex_chunk:32} {ascii_chunk}\n"
-        ascii_dump += ascii_chunk
-
-    return hex_dump, ascii_dump
-
+    def get_item_path(self, item):
+        """Retrieve the path of keys to the current item."""
+        keys = []
+        while item is not None:
+            keys.append(item.text(0))
+            item = item.parent()
+        return list(reversed(keys))
 
 def read_and_split_sav_file(file_path):
     with open(file_path, 'rb') as f:
@@ -245,7 +285,6 @@ def read_and_split_sav_file(file_path):
 
     return hex_dump, ascii_dump, split_data, dump_data
 
-
 def parse_cbor_dump(dump_data):
     try:
         cbor_data = cbor2.loads(dump_data)
@@ -254,15 +293,20 @@ def parse_cbor_dump(dump_data):
         print(f"Error parsing CBOR data: {e}")
         return None
 
+def hex_ascii_display(data):
+    hex_data = binascii.hexlify(data).decode('utf-8')
+    ascii_data = ''.join([chr(byte) if 32 <= byte < 127 else '.' for byte in data])
 
-def pil_image_to_qt_pixmap(image):
-    """Convert a PIL Image to a QPixmap."""
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    image_bytes = image.tobytes("raw", "RGB")
-    qimage = QImage(image_bytes, image.width, image.height, QImage.Format_RGB888)
-    return QPixmap.fromImage(qimage)
+    hex_dump = ""
+    ascii_dump = ""
 
+    for i in range(0, len(hex_data), 32):
+        hex_chunk = hex_data[i:i + 32]
+        ascii_chunk = ascii_data[i // 2:(i // 2) + (len(hex_chunk) // 2)]
+        hex_dump += f"{hex_chunk:32} {ascii_chunk}\n"
+        ascii_dump += ascii_chunk
+
+    return hex_dump, ascii_dump
 
 def make_human_readable(data):
     readable_data = []
@@ -293,6 +337,12 @@ def make_human_readable(data):
         readable_data = data
     return readable_data
 
+def pil_image_to_qt_pixmap(image):
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image_bytes = image.tobytes("raw", "RGB")
+    qimage = QImage(image_bytes, image.width, image.height, QImage.Format_RGB888)
+    return QPixmap.fromImage(qimage)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
