@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QSplitter, QStatusBar, QTabWidget, QAction, QTextEdit
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon
 from PIL import Image
 
 class CBORViewerApp(QMainWindow):
@@ -16,6 +16,9 @@ class CBORViewerApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("BGE 20th Anniversary Save Editor")
         self.setGeometry(100, 100, 1000, 700)
+        
+        # Set your custom icon here (ensure you have the path to the icon)
+        self.setWindowIcon(QIcon(r"C:\Users\jakee\Documents\ouput\icon.ico"))
 
         self.original_data = None
         self.cbor_data = None
@@ -24,6 +27,7 @@ class CBORViewerApp(QMainWindow):
         self.current_file_path = None
 
         self.init_ui()
+        self.apply_theme()
 
     def init_ui(self):
         central_widget = QWidget()
@@ -68,6 +72,72 @@ class CBORViewerApp(QMainWindow):
         save_action = QAction("Save Changes", self)
         save_action.triggered.connect(self.save_changes)
         file_menu.addAction(save_action)
+
+    def apply_theme(self):
+        """Apply Beyond Good and Evil inspired theme with gradients and custom panel colors."""
+        self.setStyleSheet("""
+            QMainWindow {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 #2e2e2e, stop:1 #1e1e1e);
+            }
+            QTreeWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 #3a3a3a, stop:1 #2b2b2b);
+                color: #e0e0e0;
+                border: 1px solid #00cc66;
+                font-family: 'Verdana';
+                font-size: 12pt;
+            }
+            QTreeWidget::item {
+                color: #e0e0e0;
+            }
+            QTreeWidget::item:selected {
+                background-color: #00cc66;
+                color: #000000;
+            }
+            QTabWidget::pane {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 #444444, stop:1 #333333);
+                border: 1px solid #00cc66;
+            }
+            QScrollArea {
+                background-color: #3a3a3a;
+                border: 1px solid #00cc66;
+            }
+            QTextEdit {
+                background-color: #3a3a3a;
+                color: #e0e0e0;
+                border: 1px solid #00cc66;
+            }
+            QLabel {
+                color: #e0e0e0;
+            }
+            QMenuBar {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 #2e2e2e, stop:1 #1e1e1e);
+                color: #00cc66;
+            }
+            QMenuBar::item {
+                background: transparent;
+                color: #00cc66;
+            }
+            QMenuBar::item:selected {
+                background-color: #00cc66;
+                color: #000000;
+            }
+            QStatusBar {
+                background-color: #2e2e2e;
+                color: #00cc66;
+            }
+            QMessageBox {
+                background-color: #3a3a3a;
+                color: #e0e0e0;
+            }
+        """)
+
+        # Set the font for the whole application
+        font = QFont('Verdana', 10)
+        QApplication.setFont(font)
 
     def open_file(self):
         try:
