@@ -9,6 +9,10 @@ Usage
 - edit what you want to 
 - save
 
+current state 
+- while this is working there is still a lot to be done 
+- so far i know for a fact credits editing works (f_sally_fric) under ai buffer drop down 
+- pearls, inventory management and companion stuffs still needs figuring out
 
  Credits 
 thanks to Zeli for helping out with troubleshooting :) 
