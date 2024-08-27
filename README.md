@@ -14,5 +14,8 @@ current state
 - so far i know for a fact credits editing works (f_sally_fric) under ai buffer drop down 
 - pearls, inventory management and companion stuffs still needs figuring out
 
+colabiration 
+- the source code is in the repo, if you know what to look for and know how to analyse the save file, please feel free to fork this and take it further, fully open source for the community. 
+
  Credits 
 thanks to Zeli for helping out with troubleshooting :) 
