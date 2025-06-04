@@ -2,23 +2,46 @@ import sys
 import binascii
 import cbor2
 import io
+import logging
+from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QTreeWidget, QTreeWidgetItem,
     QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QInputDialog,
-    QSplitter, QStatusBar, QTabWidget, QAction, QTextEdit
+    QSplitter, QStatusBar, QTabWidget, QAction, QTextEdit, QLineEdit, QHBoxLayout
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon
 from PIL import Image
 
+from config import Config
+from exceptions import SaveFileError, CBORParsingError, ValueValidationError
+from backup_manager import BackupManager
+from validators import ValueValidator
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bge_save_editor.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 class CBORViewerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("BGE 20th Anniversary Save Editor")
-        self.setGeometry(100, 100, 1000, 700)
+        self.setWindowTitle(f"{Config.APP_NAME} v{Config.VERSION}")
+        self.setGeometry(100, 100, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT)
         
-        # Set your custom icon here (ensure you have the path to the icon)
-        self.setWindowIcon(QIcon(r"C:\Users\jakee\Documents\ouput\icon.ico"))
+        # Set icon if it exists
+        if Config.ICON_PATH.exists():
+            self.setWindowIcon(QIcon(str(Config.ICON_PATH)))
+        
+        # Initialize managers
+        self.backup_manager = BackupManager()
+        self.validator = ValueValidator()
 
         self.original_data = None
         self.cbor_data = None
@@ -28,11 +51,24 @@ class CBORViewerApp(QMainWindow):
 
         self.init_ui()
         self.apply_theme()
+        
+        logger.info(f"Application started: {Config.APP_NAME} v{Config.VERSION}")
 
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
+
+        # Add search bar
+        search_layout = QHBoxLayout()
+        search_label = QLabel("Search:")
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Search save data...")
+        self.search_bar.textChanged.connect(self.filter_tree)
+        search_layout.addWidget(search_label)
+        search_layout.addWidget(self.search_bar)
+        search_layout.addStretch()
+        layout.addLayout(search_layout)
 
         splitter = QSplitter(Qt.Horizontal)
 
@@ -75,64 +111,71 @@ class CBORViewerApp(QMainWindow):
 
     def apply_theme(self):
         """Apply Beyond Good and Evil inspired theme with gradients and custom panel colors."""
-        self.setStyleSheet("""
-            QMainWindow {
+        colors = Config.THEME_COLORS
+        self.setStyleSheet(f"""
+            QMainWindow {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                            stop:0 #2e2e2e, stop:1 #1e1e1e);
-            }
-            QTreeWidget {
+                                            stop:0 {colors['background_main']}, stop:1 {colors['background_secondary']});
+            }}
+            QTreeWidget {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                            stop:0 #3a3a3a, stop:1 #2b2b2b);
-                color: #e0e0e0;
-                border: 1px solid #00cc66;
+                                            stop:0 {colors['background_widget']}, stop:1 #2b2b2b);
+                color: {colors['text_primary']};
+                border: 1px solid {colors['border']};
                 font-family: 'Verdana';
                 font-size: 12pt;
-            }
-            QTreeWidget::item {
-                color: #e0e0e0;
-            }
-            QTreeWidget::item:selected {
-                background-color: #00cc66;
-                color: #000000;
-            }
-            QTabWidget::pane {
+            }}
+            QTreeWidget::item {{
+                color: {colors['text_primary']};
+            }}
+            QTreeWidget::item:selected {{
+                background-color: {colors['background_selected']};
+                color: {colors['text_selected']};
+            }}
+            QTabWidget::pane {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                                             stop:0 #444444, stop:1 #333333);
-                border: 1px solid #00cc66;
-            }
-            QScrollArea {
-                background-color: #3a3a3a;
-                border: 1px solid #00cc66;
-            }
-            QTextEdit {
-                background-color: #3a3a3a;
-                color: #e0e0e0;
-                border: 1px solid #00cc66;
-            }
-            QLabel {
-                color: #e0e0e0;
-            }
-            QMenuBar {
+                border: 1px solid {colors['border']};
+            }}
+            QScrollArea {{
+                background-color: {colors['background_widget']};
+                border: 1px solid {colors['border']};
+            }}
+            QTextEdit {{
+                background-color: {colors['background_widget']};
+                color: {colors['text_primary']};
+                border: 1px solid {colors['border']};
+            }}
+            QLineEdit {{
+                background-color: {colors['background_widget']};
+                color: {colors['text_primary']};
+                border: 1px solid {colors['border']};
+                padding: 5px;
+            }}
+            QLabel {{
+                color: {colors['text_primary']};
+            }}
+            QMenuBar {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                            stop:0 #2e2e2e, stop:1 #1e1e1e);
-                color: #00cc66;
-            }
-            QMenuBar::item {
+                                            stop:0 {colors['background_main']}, stop:1 {colors['background_secondary']});
+                color: {colors['primary']};
+            }}
+            QMenuBar::item {{
                 background: transparent;
-                color: #00cc66;
-            }
-            QMenuBar::item:selected {
-                background-color: #00cc66;
-                color: #000000;
-            }
-            QStatusBar {
-                background-color: #2e2e2e;
-                color: #00cc66;
-            }
-            QMessageBox {
-                background-color: #3a3a3a;
-                color: #e0e0e0;
-            }
+                color: {colors['primary']};
+            }}
+            QMenuBar::item:selected {{
+                background-color: {colors['primary']};
+                color: {colors['text_selected']};
+            }}
+            QStatusBar {{
+                background-color: {colors['background_main']};
+                color: {colors['primary']};
+            }}
+            QMessageBox {{
+                background-color: {colors['background_widget']};
+                color: {colors['text_primary']};
+            }}
         """)
 
         # Set the font for the whole application
@@ -141,11 +184,28 @@ class CBORViewerApp(QMainWindow):
 
     def open_file(self):
         try:
-            file_path, _ = QFileDialog.getOpenFileName(self, "Select a .sav file", "", "SAV files (*.sav)")
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Select a .sav file", "", "SAV files (*.sav)"
+            )
             if not file_path:
                 return
 
-            self.current_file_path = file_path  # Store the current file path
+            # Create backup before opening
+            try:
+                backup_path = self.backup_manager.create_backup(file_path)
+                logger.info(f"Backup created: {backup_path}")
+                self.status_bar.showMessage(f"Backup created: {backup_path.name}", 3000)
+            except Exception as e:
+                logger.warning(f"Failed to create backup: {e}")
+                reply = QMessageBox.question(
+                    self, "Backup Failed", 
+                    f"Failed to create backup: {e}\n\nContinue without backup?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+
+            self.current_file_path = file_path
 
             with open(file_path, 'rb') as f:
                 self.original_data = f.read()
@@ -154,15 +214,21 @@ class CBORViewerApp(QMainWindow):
             self.cbor_data = parse_cbor_dump(self.dump_data)
 
             if not self.cbor_data:
-                QMessageBox.critical(self, "Error", "Failed to parse CBOR data.")
-                return
+                raise CBORParsingError("Failed to parse CBOR data from save file")
 
             self.human_readable_data = make_human_readable(self.cbor_data)
             self.populate_tree(self.human_readable_data)
             self.status_bar.showMessage("File loaded successfully.", 5000)
+            logger.info(f"Successfully loaded save file: {file_path}")
+            
+        except SaveFileError as e:
+            QMessageBox.critical(self, "Save File Error", str(e))
+            self.status_bar.showMessage("Failed to load file.", 5000)
+            logger.error(f"Save file error: {e}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open file: {e}")
             self.status_bar.showMessage("Failed to load file.", 5000)
+            logger.error(f"Unexpected error opening file: {e}")
 
     def populate_tree(self, data, parent=None):
         if parent is None:
@@ -222,11 +288,32 @@ class CBORViewerApp(QMainWindow):
                 current_value = item.text(1)
                 current_details = self.get_detailed_information(item)
                 value_type = current_details.split('Type: ')[1].strip()
-                new_value, ok = QInputDialog.getText(self, "Edit Value", f"New Value (Type: {value_type}):", text=current_value)
+                
+                # Get key path for validation
+                keys = self.get_item_path(item)
+                
+                new_value, ok = QInputDialog.getText(
+                    self, "Edit Value", 
+                    f"New Value (Type: {value_type}):\nField: {' > '.join(keys)}", 
+                    text=current_value
+                )
+                
                 if ok and new_value != current_value:
-                    item.setText(1, new_value)
-                    self.update_cbor_data(item, new_value, value_type)
-                    self.status_bar.showMessage("Value updated.", 5000)
+                    try:
+                        # Validate the new value
+                        validated_value = self.validator.validate(keys, new_value, value_type)
+                        item.setText(1, str(validated_value))
+                        self.update_cbor_data(item, validated_value, value_type)
+                        self.status_bar.showMessage("Value updated successfully.", 5000)
+                        logger.info(f"Updated {' > '.join(keys)}: {current_value} -> {validated_value}")
+                        
+                    except ValueValidationError as e:
+                        QMessageBox.warning(self, "Validation Error", str(e))
+                        self.status_bar.showMessage("Validation failed.", 5000)
+                    except Exception as e:
+                        QMessageBox.critical(self, "Error", f"Failed to update value: {e}")
+                        self.status_bar.showMessage("Update failed.", 5000)
+                        logger.error(f"Failed to update value: {e}")
 
     def get_value(self, d, keys):
         """Retrieve value from nested dictionary using a list of keys."""
@@ -328,6 +415,51 @@ class CBORViewerApp(QMainWindow):
             keys.append(item.text(0))
             item = item.parent()
         return list(reversed(keys))
+    
+    def filter_tree(self, search_text):
+        """Filter tree items based on search text"""
+        if not search_text:
+            # Show all items if search is empty
+            self._show_all_items(self.tree.invisibleRootItem())
+            return
+        
+        search_text = search_text.lower()
+        self._filter_items(self.tree.invisibleRootItem(), search_text)
+    
+    def _show_all_items(self, parent):
+        """Recursively show all items"""
+        for i in range(parent.childCount()):
+            child = parent.child(i)
+            child.setHidden(False)
+            self._show_all_items(child)
+    
+    def _filter_items(self, parent, search_text):
+        """Recursively filter items based on search text"""
+        for i in range(parent.childCount()):
+            child = parent.child(i)
+            
+            # Check if this item or any of its children match
+            should_show = self._item_matches_search(child, search_text)
+            
+            # Recursively check children
+            child_matches = self._filter_items(child, search_text)
+            
+            # Show item if it matches or any child matches
+            child.setHidden(not (should_show or child_matches))
+            
+            if should_show or child_matches:
+                # Expand parent to show matching children
+                child.setExpanded(True)
+        
+        # Return True if any child was shown
+        return any(not parent.child(i).isHidden() for i in range(parent.childCount()))
+    
+    def _item_matches_search(self, item, search_text):
+        """Check if an item matches the search criteria"""
+        key_text = item.text(0).lower()
+        value_text = item.text(1).lower()
+        
+        return search_text in key_text or search_text in value_text
 
 def read_and_split_sav_file(file_path):
     with open(file_path, 'rb') as f:
@@ -356,12 +488,25 @@ def read_and_split_sav_file(file_path):
     return hex_dump, ascii_dump, split_data, dump_data
 
 def parse_cbor_dump(dump_data):
+    """
+    Parse CBOR data from save file dump section.
+    
+    Args:
+        dump_data: Raw bytes from save file dump section
+        
+    Returns:
+        Parsed CBOR data as dictionary
+        
+    Raises:
+        CBORParsingError: If CBOR data is malformed
+    """
     try:
         cbor_data = cbor2.loads(dump_data)
+        logger.info("Successfully parsed CBOR data")
         return cbor_data
     except Exception as e:
-        print(f"Error parsing CBOR data: {e}")
-        return None
+        logger.error(f"Error parsing CBOR data: {e}")
+        raise CBORParsingError(f"Failed to parse CBOR data: {e}")
 
 def hex_ascii_display(data):
     hex_data = binascii.hexlify(data).decode('utf-8')
@@ -414,8 +559,23 @@ def pil_image_to_qt_pixmap(image):
     qimage = QImage(image_bytes, image.width, image.height, QImage.Format_RGB888)
     return QPixmap.fromImage(qimage)
 
+def main():
+    """Main entry point for the application"""
+    try:
+        # Ensure directories exist
+        Config.ensure_directories()
+        
+        app = QApplication(sys.argv)
+        viewer = CBORViewerApp()
+        viewer.show()
+        
+        logger.info("Application started successfully")
+        sys.exit(app.exec_())
+        
+    except Exception as e:
+        logger.critical(f"Failed to start application: {e}")
+        print(f"Critical error: {e}")
+        sys.exit(1)
+
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    viewer = CBORViewerApp()
-    viewer.show()
-    sys.exit(app.exec_())
+    main()
