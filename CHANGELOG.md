@@ -1,5 +1,49 @@
 # Changelog
 
+## Version 3.0.0 - French Translation & Enhanced UI
+
+### 🌍 Translation System
+- **French to English Translation**: Comprehensive translation of French variable names to English
+- **Bilingual Search**: Search using both French and English terms simultaneously
+- **Translation Database**: 50+ common BGE French terms mapped with descriptions
+- **Smart Pattern Recognition**: Automatic handling of prefixes, suffixes, and numbered items
+- **Contextual Tooltips**: Hover over items to see original French names and descriptions
+
+### 🎨 Enhanced User Interface
+- **Three-Column Tree View**: English translation, value, and original French key
+- **Smart Search Widget**: Advanced filtering with case sensitivity, exact match, and value search options
+- **Statistics Dashboard**: Real-time display of save file statistics (credits, pearls, health)
+- **Enhanced Detail View**: Rich information display with translation context and validation hints
+- **Professional Value Editor**: Context-aware editing dialogs with type-specific input widgets
+
+### 🔍 Advanced Search Features
+- **Multi-Language Support**: Search in both French and English automatically
+- **Filter Options**: Case sensitive, exact match, search values, include French terms
+- **Real-Time Results**: Instant filtering with 300ms debouncing for smooth performance
+- **Search Term Expansion**: Automatically includes related French/English terms
+
+### 🎯 Translation Highlights
+- **Credits**: `fric`, `argent`, `f_sally_fric` → `credits`, `sally_credits`
+- **Collectibles**: `perle`, `perles` → `pearl`, `pearls`
+- **Health**: `vie`, `sante`, `energie` → `life`, `health`, `energy`
+- **Game Elements**: `niveau`, `temps`, `inventaire` → `level`, `time`, `inventory`
+- **Locations**: `usine`, `ville`, `laboratoire` → `factory`, `city`, `laboratory`
+
+### 🔧 Technical Improvements
+- **Translation Caching**: Performance optimization for repeated translations
+- **Enhanced Validation**: French term support in value validation system
+- **Modular UI Components**: Professional widget architecture with reusable components
+- **Improved Error Handling**: Better user feedback with translation context
+
+### 📁 New Files
+- `translations.py` - Complete French to English translation system
+- `ui_components.py` - Enhanced UI widgets and professional components
+
+### 🔄 Updated Files
+- `read_bge20th_save.py` - Integrated translation system and enhanced UI
+- `validators.py` - Added French term validation support
+- `config.py` - Updated to version 3.0.0
+
 ## Version 2.0.0 - Major Improvements
 
 ### 🚀 New Features

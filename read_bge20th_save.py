@@ -17,6 +17,11 @@ from config import Config
 from exceptions import SaveFileError, CBORParsingError, ValueValidationError
 from backup_manager import BackupManager
 from validators import ValueValidator
+from translations import translator
+from ui_components import (
+    TranslatedTreeWidget, SmartSearchWidget, ValueEditorDialog,
+    StatsWidget, EnhancedDetailView
+)
 
 # Setup logging
 logging.basicConfig(
@@ -59,27 +64,39 @@ class CBORViewerApp(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Add search bar
-        search_layout = QHBoxLayout()
-        search_label = QLabel("Search:")
-        self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search save data...")
-        self.search_bar.textChanged.connect(self.filter_tree)
-        search_layout.addWidget(search_label)
-        search_layout.addWidget(self.search_bar)
-        search_layout.addStretch()
-        layout.addLayout(search_layout)
+        # Enhanced search widget
+        self.search_widget = SmartSearchWidget()
+        self.search_widget.searchChanged.connect(self.filter_tree_advanced)
+        layout.addWidget(self.search_widget)
 
-        splitter = QSplitter(Qt.Horizontal)
-
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Key", "Value"])
+        # Main splitter
+        main_splitter = QSplitter(Qt.Horizontal)
+        
+        # Left side: Tree and stats
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
+        # Tree widget with translation support
+        self.tree = TranslatedTreeWidget()
         self.tree.itemClicked.connect(self.on_item_clicked)
         self.tree.itemDoubleClicked.connect(self.on_item_double_click)
-        splitter.addWidget(self.tree)
+        left_layout.addWidget(self.tree)
+        
+        # Stats widget
+        self.stats_widget = StatsWidget()
+        left_layout.addWidget(self.stats_widget)
+        
+        main_splitter.addWidget(left_widget)
+        main_splitter.setSizes([600, 400])  # Give more space to tree
 
+        # Right side: Tabs for details and image viewer
         tabs = QTabWidget()
 
+        # Enhanced detail view
+        self.detail_view = EnhancedDetailView()
+        tabs.addTab(self.detail_view, "Details")
+
+        # Image viewer
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.image_label = QLabel()
@@ -87,13 +104,8 @@ class CBORViewerApp(QMainWindow):
         self.scroll_area.setWidget(self.image_label)
         tabs.addTab(self.scroll_area, "Image Viewer")
 
-        self.detail_view = QTextEdit()
-        self.detail_view.setReadOnly(True)
-        tabs.addTab(self.detail_view, "Details")
-
-        splitter.addWidget(tabs)
-
-        layout.addWidget(splitter)
+        main_splitter.addWidget(tabs)
+        layout.addWidget(main_splitter)
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -234,31 +246,57 @@ class CBORViewerApp(QMainWindow):
         if parent is None:
             self.tree.clear()
             parent = self.tree.invisibleRootItem()
+            # Update stats when populating root
+            if hasattr(self, 'stats_widget'):
+                self.stats_widget.update_stats(data)
 
         if isinstance(data, dict):
             for key, value in data.items():
-                item = QTreeWidgetItem([str(key), ""])
+                # Translate the key
+                translated_key = translator.translate_key(key)
+                display_key = translated_key if translated_key != key else key
+                
+                # Create item with translated key, value, and original key
+                item = QTreeWidgetItem([display_key, "", key])
                 parent.addChild(item)
+                
+                # Add tooltip with translation info
+                if translated_key != key:
+                    description = translator.get_description(key)
+                    tooltip = f"Original: {key}"
+                    if description:
+                        tooltip += f"\nDescription: {description}"
+                    item.setToolTip(0, tooltip)
+                
                 self.populate_tree(value, item)
         elif isinstance(data, list):
             for index, value in enumerate(data):
-                item = QTreeWidgetItem([f"[{index}]", ""])
+                item = QTreeWidgetItem([f"[{index}]", "", f"[{index}]"])
                 parent.addChild(item)
                 self.populate_tree(value, item)
         else:
             if isinstance(data, QPixmap):
-                item = QTreeWidgetItem([f"Image {parent.childCount()}", "Double-click to view"])
+                item = QTreeWidgetItem([f"Image {parent.childCount()}", "Double-click to view", "image_data"])
                 item.setData(0, Qt.UserRole, data)
                 parent.addChild(item)
             else:
-                parent.setText(1, str(data))
+                # Set the value in the second column
+                value_str = str(data)
+                if len(value_str) > 100:
+                    value_str = value_str[:100] + "..."
+                parent.setText(1, value_str)
 
     def on_item_clicked(self, item, column):
         """Show details when an item is clicked."""
         if item:  # Ensure the item is valid
             if not isinstance(item.data(0, Qt.UserRole), QPixmap):
-                details = self.get_detailed_information(item)
-                self.detail_view.setText(details)
+                # Get the original key (from third column) or displayed key
+                original_key = item.text(2) if item.text(2) else item.text(0)
+                keys = self.get_item_path(item)
+                value = self.get_value(self.cbor_data, keys)
+                
+                # Use enhanced detail view
+                self.detail_view.display_item_details(original_key, value, keys)
 
     def get_detailed_information(self, item):
         """Retrieve detailed information for the selected item."""
@@ -286,34 +324,37 @@ class CBORViewerApp(QMainWindow):
                 self.status_bar.showMessage("Image displayed.", 5000)
             else:
                 current_value = item.text(1)
-                current_details = self.get_detailed_information(item)
-                value_type = current_details.split('Type: ')[1].strip()
-                
-                # Get key path for validation
                 keys = self.get_item_path(item)
+                original_key = item.text(2) if item.text(2) else item.text(0)
+                value = self.get_value(self.cbor_data, keys)
+                value_type = type(value).__name__
                 
-                new_value, ok = QInputDialog.getText(
-                    self, "Edit Value", 
-                    f"New Value (Type: {value_type}):\nField: {' > '.join(keys)}", 
-                    text=current_value
-                )
+                # Use enhanced value editor dialog
+                dialog = ValueEditorDialog(original_key, current_value, value_type, self)
                 
-                if ok and new_value != current_value:
-                    try:
-                        # Validate the new value
-                        validated_value = self.validator.validate(keys, new_value, value_type)
-                        item.setText(1, str(validated_value))
-                        self.update_cbor_data(item, validated_value, value_type)
-                        self.status_bar.showMessage("Value updated successfully.", 5000)
-                        logger.info(f"Updated {' > '.join(keys)}: {current_value} -> {validated_value}")
-                        
-                    except ValueValidationError as e:
-                        QMessageBox.warning(self, "Validation Error", str(e))
-                        self.status_bar.showMessage("Validation failed.", 5000)
-                    except Exception as e:
-                        QMessageBox.critical(self, "Error", f"Failed to update value: {e}")
-                        self.status_bar.showMessage("Update failed.", 5000)
-                        logger.error(f"Failed to update value: {e}")
+                if dialog.exec_() == QDialog.Accepted:
+                    new_value = dialog.get_value()
+                    
+                    if str(new_value) != current_value:
+                        try:
+                            # Validate the new value
+                            validated_value = self.validator.validate(keys, new_value, value_type)
+                            item.setText(1, str(validated_value))
+                            self.update_cbor_data(item, validated_value, value_type)
+                            self.status_bar.showMessage("Value updated successfully.", 5000)
+                            logger.info(f"Updated {' > '.join(keys)}: {current_value} -> {validated_value}")
+                            
+                            # Update stats if needed
+                            if hasattr(self, 'stats_widget'):
+                                self.stats_widget.update_stats(self.cbor_data)
+                            
+                        except ValueValidationError as e:
+                            QMessageBox.warning(self, "Validation Error", str(e))
+                            self.status_bar.showMessage("Validation failed.", 5000)
+                        except Exception as e:
+                            QMessageBox.critical(self, "Error", f"Failed to update value: {e}")
+                            self.status_bar.showMessage("Update failed.", 5000)
+                            logger.error(f"Failed to update value: {e}")
 
     def get_value(self, d, keys):
         """Retrieve value from nested dictionary using a list of keys."""
@@ -416,15 +457,38 @@ class CBORViewerApp(QMainWindow):
             item = item.parent()
         return list(reversed(keys))
     
-    def filter_tree(self, search_text):
-        """Filter tree items based on search text"""
+    def filter_tree_advanced(self, search_text, filters):
+        """Advanced filtering with translation support and multiple options"""
         if not search_text:
             # Show all items if search is empty
             self._show_all_items(self.tree.invisibleRootItem())
             return
         
-        search_text = search_text.lower()
-        self._filter_items(self.tree.invisibleRootItem(), search_text)
+        # Prepare search terms
+        search_terms = [search_text]
+        if not filters['case_sensitive']:
+            search_terms = [term.lower() for term in search_terms]
+        
+        # Add French translations if enabled
+        if filters['french_terms']:
+            # Try to find French equivalents
+            for french_key, english_key in translator.DIRECT_TRANSLATIONS.items():
+                if english_key in search_text.lower():
+                    search_terms.append(french_key if filters['case_sensitive'] else french_key.lower())
+                elif french_key in search_text.lower():
+                    search_terms.append(english_key if filters['case_sensitive'] else english_key.lower())
+        
+        self._filter_items_advanced(self.tree.invisibleRootItem(), search_terms, filters)
+    
+    def filter_tree(self, search_text):
+        """Simple filter for backward compatibility"""
+        filters = {
+            'case_sensitive': False,
+            'exact_match': False,
+            'search_values': True,
+            'french_terms': True
+        }
+        self.filter_tree_advanced(search_text, filters)
     
     def _show_all_items(self, parent):
         """Recursively show all items"""
@@ -454,12 +518,66 @@ class CBORViewerApp(QMainWindow):
         # Return True if any child was shown
         return any(not parent.child(i).isHidden() for i in range(parent.childCount()))
     
+    def _filter_items_advanced(self, parent, search_terms, filters):
+        """Advanced recursive filtering with multiple search terms and options"""
+        for i in range(parent.childCount()):
+            child = parent.child(i)
+            
+            # Check if this item or any of its children match
+            should_show = self._item_matches_search_advanced(child, search_terms, filters)
+            
+            # Recursively check children
+            child_matches = self._filter_items_advanced(child, search_terms, filters)
+            
+            # Show item if it matches or any child matches
+            child.setHidden(not (should_show or child_matches))
+            
+            if should_show or child_matches:
+                # Expand parent to show matching children
+                child.setExpanded(True)
+        
+        # Return True if any child was shown
+        return any(not parent.child(i).isHidden() for i in range(parent.childCount()))
+    
+    def _item_matches_search_advanced(self, item, search_terms, filters):
+        """Check if an item matches the advanced search criteria"""
+        # Get text to search
+        key_text = item.text(0)  # Translated key
+        original_key = item.text(2) if item.text(2) else item.text(0)  # Original key
+        value_text = item.text(1) if filters['search_values'] else ""
+        
+        # Apply case sensitivity
+        if not filters['case_sensitive']:
+            key_text = key_text.lower()
+            original_key = original_key.lower()
+            value_text = value_text.lower()
+        
+        # Check all search terms
+        for search_term in search_terms:
+            if filters['exact_match']:
+                # Exact match
+                if (search_term == key_text or 
+                    search_term == original_key or 
+                    (filters['search_values'] and search_term == value_text)):
+                    return True
+            else:
+                # Partial match
+                if (search_term in key_text or 
+                    search_term in original_key or 
+                    (filters['search_values'] and search_term in value_text)):
+                    return True
+        
+        return False
+    
     def _item_matches_search(self, item, search_text):
-        """Check if an item matches the search criteria"""
+        """Check if an item matches the search criteria (simple version)"""
         key_text = item.text(0).lower()
+        original_key = item.text(2).lower() if item.text(2) else ""
         value_text = item.text(1).lower()
         
-        return search_text in key_text or search_text in value_text
+        return (search_text in key_text or 
+                search_text in original_key or 
+                search_text in value_text)
 
 def read_and_split_sav_file(file_path):
     with open(file_path, 'rb') as f:

@@ -14,10 +14,32 @@ class ValueValidator:
     
     def __init__(self):
         self.validators: Dict[str, Callable] = {
+            # Credits (English and French)
             'credits': self._validate_credits,
-            'pearls': self._validate_pearls,
-            'health': self._validate_health,
             'f_sally_fric': self._validate_credits,  # Credits field
+            'fric': self._validate_credits,
+            'argent': self._validate_credits,
+            'sally_credits': self._validate_credits,
+            
+            # Pearls (English and French)
+            'pearls': self._validate_pearls,
+            'pearl': self._validate_pearls,
+            'perles': self._validate_pearls,
+            'perle': self._validate_pearls,
+            
+            # Health (English and French)
+            'health': self._validate_health,
+            'life': self._validate_health,
+            'vie': self._validate_health,
+            'sante': self._validate_health,
+            'energie': self._validate_health,
+            
+            # Other game values
+            'niveau': self._validate_level,
+            'level': self._validate_level,
+            'score': self._validate_score,
+            'temps': self._validate_time,
+            'time': self._validate_time,
         }
     
     def validate(self, key_path: list, value: Any, value_type: str) -> Any:
@@ -107,3 +129,39 @@ class ValueValidator:
                 raise ValueValidationError("Float value out of reasonable range")
         
         return value
+    
+    def _validate_level(self, value: Any) -> int:
+        """Validate level values (1-50)"""
+        try:
+            level = int(value)
+            if level < 1:
+                raise ValueValidationError("Level must be at least 1")
+            if level > 50:
+                raise ValueValidationError("Level cannot exceed 50")
+            return level
+        except (ValueError, TypeError):
+            raise ValueValidationError("Level must be a valid integer")
+    
+    def _validate_score(self, value: Any) -> int:
+        """Validate score values (0-9999999)"""
+        try:
+            score = int(value)
+            if score < 0:
+                raise ValueValidationError("Score cannot be negative")
+            if score > 9999999:
+                raise ValueValidationError("Score cannot exceed 9,999,999")
+            return score
+        except (ValueError, TypeError):
+            raise ValueValidationError("Score must be a valid integer")
+    
+    def _validate_time(self, value: Any) -> float:
+        """Validate time values (0-86400 seconds = 24 hours)"""
+        try:
+            time_val = float(value)
+            if time_val < 0:
+                raise ValueValidationError("Time cannot be negative")
+            if time_val > 86400:
+                raise ValueValidationError("Time cannot exceed 24 hours (86400 seconds)")
+            return time_val
+        except (ValueError, TypeError):
+            raise ValueValidationError("Time must be a valid number")

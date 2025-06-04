@@ -1,15 +1,23 @@
 # BGE 20th Anniversary Save Editor
 
-A comprehensive save file editor for **Beyond Good and Evil 20th Anniversary Edition** with enhanced safety features, search functionality, and automatic backups.
+A comprehensive save file editor for **Beyond Good and Evil 20th Anniversary Edition** with French-to-English translation, enhanced UI, and professional safety features.
 
-## 🚀 Version 2.0.0 - Major Update!
+## 🚀 Version 3.0.0 - Translation & Enhanced UI Update!
 
-### ✨ New Features
+### ✨ New Features in v3.0.0
+- **🌍 French to English Translation** - Automatically translates French variable names to English
+- **🔍 Bilingual Search** - Search using both French and English terms simultaneously
+- **📊 Statistics Dashboard** - Real-time save file statistics (credits, pearls, health)
+- **🎨 Enhanced UI Components** - Professional three-column tree view and smart dialogs
+- **💡 Contextual Tooltips** - Hover for original French names and descriptions
+- **🎯 Smart Value Editor** - Context-aware editing with validation hints
+
+### ✨ Features from v2.0.0
 - **🔒 Automatic Backup System** - Never lose your saves again!
-- **🔍 Search Functionality** - Quickly find specific save data
+- **🔍 Advanced Search** - Quickly find specific save data with filters
 - **✅ Value Validation** - Prevents invalid edits that could corrupt saves
 - **📝 Enhanced Logging** - Detailed logs for troubleshooting
-- **🎨 Improved UI** - Better themes and user experience
+- **🎨 Professional UI** - Better themes and user experience
 
 ## 📋 Requirements
 
@@ -36,19 +44,27 @@ pip install -r requirements.txt
    - Navigate to your BGE save file (usually `.sav` extension)
 
 3. **Edit your save data**:
-   - Use the search bar to find specific values (e.g., "credits", "pearls")
-   - Double-click any value to edit it
+   - Use the enhanced search bar to find values in both French and English
+   - Double-click any value to edit it with the smart value editor
    - The app validates your changes to prevent corruption
+   - View statistics in the dashboard for quick overview
 
 4. **Save your changes** (File → Save Changes)
    - Only modified values are updated
    - Original file structure is preserved
 
-### 🔍 Search Tips
-- Search for "credits" to find currency values
-- Search for "pearl" to find collectibles
-- Search for "health" to find player stats
-- Use partial matches (e.g., "fric" finds "f_sally_fric")
+### 🌍 Translation Features
+The editor automatically translates French variable names to English:
+- **Credits**: `fric`, `argent`, `f_sally_fric` → `credits`, `sally_credits`
+- **Collectibles**: `perle`, `perles` → `pearl`, `pearls`
+- **Health**: `vie`, `sante`, `energie` → `life`, `health`, `energy`
+- **Game Elements**: `niveau`, `temps`, `inventaire` → `level`, `time`, `inventory`
+
+### 🔍 Enhanced Search Tips
+- Search in **both languages**: "credits" or "fric" will find the same items
+- Use **filter options**: Case sensitive, exact match, search values
+- **Hover tooltips**: See original French names and descriptions
+- **Statistics view**: Quick overview of credits, pearls, and health
 
 ## ✅ Confirmed Working Features
 
