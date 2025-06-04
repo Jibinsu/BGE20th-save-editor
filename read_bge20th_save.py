@@ -22,6 +22,11 @@ from ui_components import (
     TranslatedTreeWidget, SmartSearchWidget, ValueEditorDialog,
     StatsWidget, EnhancedDetailView
 )
+from v4_ui_components import V4TabWidget
+from undo_system import undo_system
+from pearls_manager import pearls_manager
+from inventory_manager import inventory_manager
+from companion_manager import companion_manager
 
 # Setup logging
 logging.basicConfig(
@@ -34,7 +39,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class CBORViewerApp(QMainWindow):
+class BGESaveEditor(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{Config.APP_NAME} v{Config.VERSION}")
@@ -89,7 +94,7 @@ class CBORViewerApp(QMainWindow):
         main_splitter.addWidget(left_widget)
         main_splitter.setSizes([600, 400])  # Give more space to tree
 
-        # Right side: Tabs for details and image viewer
+        # Right side: Tabs for details, image viewer, and v4 features
         tabs = QTabWidget()
 
         # Enhanced detail view
@@ -104,15 +109,29 @@ class CBORViewerApp(QMainWindow):
         self.scroll_area.setWidget(self.image_label)
         tabs.addTab(self.scroll_area, "Image Viewer")
 
+        # V4 Features tab widget
+        self.v4_widget = V4TabWidget()
+        tabs.addTab(self.v4_widget, "🚀 V4 Features")
+
         main_splitter.addWidget(tabs)
         layout.addWidget(main_splitter)
+
+        # Add undo/redo widget to toolbar
+        toolbar = self.addToolBar("Main")
+        undo_widget = self.v4_widget.get_undo_widget()
+        toolbar.addWidget(undo_widget)
+        
+        # Connect undo/redo actions
+        undo_widget.undo_button.clicked.connect(self.undo_action)
+        undo_widget.redo_button.clicked.connect(self.redo_action)
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
         menu_bar = self.menuBar()
+        
+        # File menu
         file_menu = menu_bar.addMenu("File")
-
         open_action = QAction("Open", self)
         open_action.triggered.connect(self.open_file)
         file_menu.addAction(open_action)
@@ -120,6 +139,40 @@ class CBORViewerApp(QMainWindow):
         save_action = QAction("Save Changes", self)
         save_action.triggered.connect(self.save_changes)
         file_menu.addAction(save_action)
+        
+        file_menu.addSeparator()
+        
+        backup_action = QAction("Create Backup", self)
+        backup_action.triggered.connect(self.create_backup)
+        file_menu.addAction(backup_action)
+        
+        # Edit menu
+        edit_menu = menu_bar.addMenu("Edit")
+        
+        undo_action = QAction("Undo", self)
+        undo_action.setShortcut("Ctrl+Z")
+        undo_action.triggered.connect(self.undo_action)
+        edit_menu.addAction(undo_action)
+        
+        redo_action = QAction("Redo", self)
+        redo_action.setShortcut("Ctrl+Y")
+        redo_action.triggered.connect(self.redo_action)
+        edit_menu.addAction(redo_action)
+        
+        # V4 Features menu
+        v4_menu = menu_bar.addMenu("V4 Features")
+        
+        pearls_action = QAction("🔮 Manage Pearls", self)
+        pearls_action.triggered.connect(lambda: self.v4_widget.setCurrentIndex(0))
+        v4_menu.addAction(pearls_action)
+        
+        inventory_action = QAction("🎒 Manage Inventory", self)
+        inventory_action.triggered.connect(lambda: self.v4_widget.setCurrentIndex(1))
+        v4_menu.addAction(inventory_action)
+        
+        companions_action = QAction("🤝 Manage Companions", self)
+        companions_action.triggered.connect(lambda: self.v4_widget.setCurrentIndex(2))
+        v4_menu.addAction(companions_action)
 
     def apply_theme(self):
         """Apply Beyond Good and Evil inspired theme with gradients and custom panel colors."""
@@ -230,6 +283,13 @@ class CBORViewerApp(QMainWindow):
 
             self.human_readable_data = make_human_readable(self.cbor_data)
             self.populate_tree(self.human_readable_data)
+            
+            # Load data into v4 managers
+            self.v4_widget.set_save_data(self.human_readable_data)
+            
+            # Clear undo history for new file
+            undo_system.clear_history()
+            
             self.status_bar.showMessage("File loaded successfully.", 5000)
             logger.info(f"Successfully loaded save file: {file_path}")
             
@@ -402,6 +462,45 @@ class CBORViewerApp(QMainWindow):
                 return str(value)
         except ValueError:
             return value
+
+    def undo_action(self):
+        """Perform undo action"""
+        if undo_system.undo(self.human_readable_data):
+            # Refresh the tree and v4 widgets
+            self.populate_tree(self.human_readable_data)
+            self.v4_widget.set_save_data(self.human_readable_data)
+            self.status_bar.showMessage("Undo successful", 2000)
+            logger.info("Undo action performed")
+        else:
+            self.status_bar.showMessage("Nothing to undo", 2000)
+
+    def redo_action(self):
+        """Perform redo action"""
+        if undo_system.redo(self.human_readable_data):
+            # Refresh the tree and v4 widgets
+            self.populate_tree(self.human_readable_data)
+            self.v4_widget.set_save_data(self.human_readable_data)
+            self.status_bar.showMessage("Redo successful", 2000)
+            logger.info("Redo action performed")
+        else:
+            self.status_bar.showMessage("Nothing to redo", 2000)
+
+    def create_backup(self):
+        """Create a manual backup of the current file"""
+        if not self.current_file_path:
+            QMessageBox.warning(self, "No File", "No file is currently loaded.")
+            return
+        
+        try:
+            backup_path = self.backup_manager.create_backup(self.current_file_path)
+            QMessageBox.information(
+                self, "Backup Created", 
+                f"Backup created successfully:\n{backup_path}"
+            )
+            logger.info(f"Manual backup created: {backup_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Backup Failed", f"Failed to create backup: {e}")
+            logger.error(f"Manual backup failed: {e}")
 
     def save_changes(self):
         try:
@@ -684,7 +783,7 @@ def main():
         Config.ensure_directories()
         
         app = QApplication(sys.argv)
-        viewer = CBORViewerApp()
+        viewer = BGESaveEditor()
         viewer.show()
         
         logger.info("Application started successfully")

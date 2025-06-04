@@ -1,10 +1,38 @@
 # BGE 20th Anniversary Save Editor
 
-A comprehensive save file editor for **Beyond Good and Evil 20th Anniversary Edition** with French-to-English translation, enhanced UI, and professional safety features.
+A comprehensive save file editor for **Beyond Good and Evil 20th Anniversary Edition** with advanced game management features, French-to-English translation, and professional safety systems.
 
-## 🚀 Version 3.0.0 - Translation & Enhanced UI Update!
+## 🚀 Version 4.0.0 - Advanced Game Management Features!
 
-### ✨ New Features in v3.0.0
+### 🎮 Major New Features in v4.0.0
+
+#### 🔮 Pearls Management
+- **Complete Pearl Database** - Manage all 60+ collectible pearls
+- **Smart Collection Tracking** - Visual progress by pearl type (Regular, Alpha, Story, Special)
+- **Batch Operations** - Collect/uncollect all pearls or by category
+- **Location Information** - Know exactly where each pearl can be found
+
+#### 🎒 Inventory Management
+- **Comprehensive Item System** - Weapons, tools, consumables, key items, upgrades, photos
+- **Rarity Classification** - Common to Legendary item tiers with color coding
+- **Equipment Tracking** - See what's equipped and manage loadouts
+- **Smart Quantity Control** - Add, remove, and modify item quantities safely
+
+#### 🤝 Companion Management
+- **Full Companion Control** - Manage Pey'j, Double H, vehicles, pets, and summons
+- **Health & Energy Systems** - Complete control over companion vitals
+- **Loyalty Tracking** - Monitor and adjust companion loyalty (0-100%)
+- **Status Management** - Active, inactive, injured, missing, available states
+- **Level Control** - Set companion levels (1-50) with experience tracking
+
+#### 🔄 Undo/Redo System
+- **Unlimited History** - Never worry about making mistakes
+- **Smart Batch Operations** - Group related changes together
+- **Action Descriptions** - Clear explanations of what each action does
+- **Keyboard Shortcuts** - Ctrl+Z (Undo) and Ctrl+Y (Redo)
+- **Visual Feedback** - Toolbar integration with live status
+
+### ✨ Enhanced Features from v3.0.0
 - **🌍 French to English Translation** - Automatically translates French variable names to English
 - **🔍 Bilingual Search** - Search using both French and English terms simultaneously
 - **📊 Statistics Dashboard** - Real-time save file statistics (credits, pearls, health)
@@ -12,7 +40,7 @@ A comprehensive save file editor for **Beyond Good and Evil 20th Anniversary Edi
 - **💡 Contextual Tooltips** - Hover for original French names and descriptions
 - **🎯 Smart Value Editor** - Context-aware editing with validation hints
 
-### ✨ Features from v2.0.0
+### ✨ Core Features from v2.0.0
 - **🔒 Automatic Backup System** - Never lose your saves again!
 - **🔍 Advanced Search** - Quickly find specific save data with filters
 - **✅ Value Validation** - Prevents invalid edits that could corrupt saves

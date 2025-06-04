@@ -1,5 +1,86 @@
 # Changelog
 
+## Version 4.0.0 - Advanced Game Management Features
+
+### 🚀 Major New Features
+
+#### 🔮 Pearls Management System
+- **Comprehensive Pearl Database**: 60+ known pearls with detailed information
+- **Pearl Type Classification**: Regular, Alpha, Story, and Special pearls
+- **Collection Status Management**: Easy toggle collection status for any pearl
+- **Location Tracking**: Know where each pearl can be found
+- **Batch Operations**: Collect/uncollect all pearls or by type
+- **Progress Tracking**: Visual progress bars by pearl type
+- **Search Functionality**: Find pearls by name, location, or type
+
+#### 🎒 Inventory Management System
+- **Item Database**: Comprehensive database of weapons, tools, consumables, key items, upgrades, and photos
+- **Rarity System**: Items classified by rarity (Common to Legendary)
+- **Quantity Management**: Add, remove, and modify item quantities
+- **Equipment Tracking**: Track which items are equipped
+- **Type Filtering**: Filter inventory by item type
+- **Batch Operations**: Add all items or clear inventory
+- **Value Calculation**: Automatic total value calculation
+- **Item Statistics**: Detailed breakdown by type and rarity
+
+#### 🤝 Companion Management System
+- **Companion Database**: Manage Pey'j, Double H, vehicles, pets, and summons
+- **Status Management**: Active, inactive, injured, missing, available states
+- **Health & Energy**: Full control over companion vitals
+- **Loyalty System**: Track and modify companion loyalty (0-100%)
+- **Level Management**: Set companion levels (1-50)
+- **Companion Types**: Allies, vehicles, pets, and summons
+- **Batch Operations**: Heal all, activate all, maximize loyalty
+- **Ability Tracking**: View companion abilities and specializations
+
+#### 🔄 Comprehensive Undo/Redo System
+- **Unlimited History**: Track all changes with unlimited undo/redo
+- **Action Descriptions**: Clear descriptions of what each action does
+- **Batch Operations**: Group related changes together
+- **Memory Efficient**: Smart deep copying and cleanup
+- **Visual Feedback**: Toolbar buttons with action previews
+- **Keyboard Shortcuts**: Ctrl+Z (Undo) and Ctrl+Y (Redo)
+- **History Viewer**: See complete action history
+- **Auto-cleanup**: Automatic cleanup of old actions
+
+### 🎨 Enhanced User Interface
+- **V4 Features Tab**: Dedicated tab for all new v4 functionality
+- **Integrated Toolbar**: Undo/redo controls in main toolbar
+- **Enhanced Menus**: New Edit and V4 Features menus
+- **Professional Widgets**: Custom UI components for each feature
+- **Color Coding**: Visual indicators for status, rarity, and types
+- **Progress Visualization**: Progress bars and statistics displays
+- **Context Menus**: Right-click actions for quick operations
+
+### 🔧 Technical Improvements
+- **Modular Architecture**: Separate managers for each feature
+- **Performance Optimized**: Efficient data structures and caching
+- **Error Handling**: Comprehensive error handling and logging
+- **Data Validation**: Prevent corruption with smart validation
+- **Memory Management**: Efficient memory usage and cleanup
+- **Thread Safety**: Safe concurrent operations
+
+### 🛠️ Developer Features
+- **Plugin Architecture**: Extensible system for future features
+- **API Consistency**: Consistent interfaces across all managers
+- **Documentation**: Comprehensive code documentation
+- **Type Hints**: Full type annotation support
+- **Testing Ready**: Architecture designed for easy testing
+
+### 📊 Statistics & Analytics
+- **Real-time Stats**: Live statistics for all game elements
+- **Progress Tracking**: Visual progress indicators
+- **Achievement Tracking**: Monitor collection completion
+- **Value Calculations**: Automatic worth calculations
+- **Performance Metrics**: Track editing efficiency
+
+### 🔒 Safety & Reliability
+- **Automatic Backups**: Enhanced backup system integration
+- **Change Validation**: Prevent invalid modifications
+- **Rollback Support**: Complete undo/redo for all operations
+- **Data Integrity**: Maintain save file structure integrity
+- **Error Recovery**: Graceful handling of edge cases
+
 ## Version 3.0.0 - French Translation & Enhanced UI
 
 ### 🌍 Translation System

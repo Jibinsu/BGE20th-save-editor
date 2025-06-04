@@ -7,7 +7,7 @@ from pathlib import Path
 class Config:
     # Application settings
     APP_NAME = "BGE 20th Anniversary Save Editor"
-    VERSION = "3.0.0"
+    VERSION = "4.0.0"
     
     # Paths
     BASE_DIR = Path(__file__).parent
