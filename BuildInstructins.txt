@@ -1,0 +1,49 @@
+## How to Build the Executable from Source
+
+To rebuild this application's executable (e.g., `.exe` for Windows), follow these steps:
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone [https://github.com/Jibinsu/BGE20th-save-editor.git](https://github.com/Jibinsu/BGE20th-save-editor.git)
+    cd BGE20th-save-editor
+    ```
+
+2.  **Create a Virtual Environment (Recommended):**
+    ```bash
+    python -m venv venv
+    # On Windows:
+    .\venv\Scripts\activate
+    # On macOS/Linux:
+    source venv/bin/activate
+    ```
+
+3.  **Install Dependencies:**
+    Install all required Python packages using the provided `requirements.txt` file:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Build with PyInstaller:**
+    Navigate to the directory containing your main application script (e.g., `CBORViewerApp.py` if that's your entry point, though based on the snippet provided, it might be in `main.py` or similar). Then, run PyInstaller:
+
+    *(**Option 1: Simple Command - Recommended if you don't have a `.spec` file**)*
+    ```bash
+    # Replace 'your_main_app_script.py' with the actual entry point of your application
+    pyinstaller --noconfirm --onedir --windowed --icon="path/to/your/icon.ico" "your_main_app_script.py"
+    ```
+    * `--noconfirm`: Overwrite previous builds without confirmation.
+    * `--onedir`: Creates a one-folder bundle (easier for LGPL compliance as users can potentially inspect/replace files).
+    * `--windowed`: Prevents a console window from opening.
+    * `--icon="path/to/your/icon.ico"`: Specify the path to your application icon. Ensure this path is relative to where you run PyInstaller or an absolute path.
+    * Replace `"your_main_app_script.py"` with the actual filename of the Python script that starts your `QApplication` (e.g., `main.py`, `app.py`, etc.). If your main code is directly in `read_bge20th_save.py`, then use that.
+
+    *(**Option 2: Using a `.spec` file - If you have a custom PyInstaller setup**)*
+    If you've previously run PyInstaller and generated a `.spec` file (e.g., `your_app.spec`), you can just use that:
+    ```bash
+    pyinstaller --noconfirm "your_app.spec"
+    ```
+
+5.  **Find the Executable:**
+    The generated executable will be located in the `dist` folder within your project directory (e.g., `dist/your_app/your_app.exe`).
+
+---
