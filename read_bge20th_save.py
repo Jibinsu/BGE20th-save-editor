@@ -160,6 +160,7 @@ class CBORViewerApp(QMainWindow):
             self.human_readable_data = make_human_readable(self.cbor_data)
             self.populate_tree(self.human_readable_data)
             self.status_bar.showMessage("File loaded successfully.", 5000)
+            self.changes = {} # Clear changes from previous file
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open file: {e}")
             self.status_bar.showMessage("Failed to load file.", 5000)
@@ -197,10 +198,10 @@ class CBORViewerApp(QMainWindow):
     def get_detailed_information(self, item):
         """Retrieve detailed information for the selected item."""
         keys = []
-        while item is not None:
-            keys.append(item.text(0))
-            item = item.parent()
-        keys = list(reversed(keys))
+        temp_item = item
+        while temp_item is not None:
+            keys.insert(0, temp_item.text(0))
+            temp_item = temp_item.parent()
 
         value = self.get_value(self.cbor_data, keys)
         value_type = type(value).__name__
@@ -213,7 +214,7 @@ class CBORViewerApp(QMainWindow):
 
     def on_item_double_click(self, item, column):
         """Handle double-clicks to edit or view items."""
-        if item:  # Ensure the item is valid
+        if item and item.childCount() == 0:  # Ensure the item is valid and is a leaf node
             if isinstance(item.data(0, Qt.UserRole), QPixmap):
                 pixmap = item.data(0, Qt.UserRole)
                 self.image_label.setPixmap(pixmap)
@@ -221,47 +222,74 @@ class CBORViewerApp(QMainWindow):
             else:
                 current_value = item.text(1)
                 current_details = self.get_detailed_information(item)
-                value_type = current_details.split('Type: ')[1].strip()
+                value_type = current_details.split('Type: ')[1].split('\n')[0].strip()
+                
                 new_value, ok = QInputDialog.getText(self, "Edit Value", f"New Value (Type: {value_type}):", text=current_value)
+                
                 if ok and new_value != current_value:
                     item.setText(1, new_value)
                     self.update_cbor_data(item, new_value, value_type)
                     self.status_bar.showMessage("Value updated.", 5000)
 
     def get_value(self, d, keys):
-        """Retrieve value from nested dictionary using a list of keys."""
-        for key in keys:
-            if key.startswith("[") and key.endswith("]"):
-                d = d[int(key[1:-1])]
-            else:
-                d = d[key]
-        return d
+        """Retrieve value from nested dictionary/list using a list of keys."""
+        try:
+            for key in keys:
+                if isinstance(d, list) and key.startswith("[") and key.endswith("]"):
+                    d = d[int(key[1:-1])]
+                elif isinstance(d, dict):
+                    # Find the actual key since readable keys might be different
+                    found = False
+                    for k_orig in d.keys():
+                        if str(k_orig) == key:
+                            d = d[k_orig]
+                            found = True
+                            break
+                    if not found:
+                        return None # Key not found
+                else:
+                    return d
+            return d
+        except (KeyError, IndexError, TypeError):
+            return None
+
 
     def update_cbor_data(self, item, new_value, value_type):
         if item:  # Ensure the item is valid
             keys = []
-            while item is not None:
-                keys.append(item.text(0))
-                item = item.parent()
-            keys = list(reversed(keys))
+            temp_item = item
+            while temp_item is not None:
+                keys.insert(0, temp_item.text(0))
+                temp_item = temp_item.parent()
 
             def set_value(d, keys, value):
                 for key in keys[:-1]:
-                    if key.startswith("[") and key.endswith("]"):
+                    if isinstance(d, list) and key.startswith("[") and key.endswith("]"):
                         d = d[int(key[1:-1])]
-                    else:
-                        d = d[key]
-
-                if keys[-1].startswith("[") and keys[-1].endswith("]"):
-                    original_value = d[int(keys[-1][1:-1])]
-                    d[int(keys[-1][1:-1])] = self.cast_to_correct_type(value, value_type)
-                else:
-                    original_value = d[keys[-1]]
-                    d[keys[-1]] = self.cast_to_correct_type(value, value_type)
-
-            self.changes[tuple(keys)] = {"original": self.get_value(self.cbor_data, keys), "new": new_value, "type": value_type}
+                    elif isinstance(d, dict):
+                        found = False
+                        for k_orig in d.keys():
+                            if str(k_orig) == key:
+                                d = d[k_orig]
+                                found = True
+                                break
+                        if not found:
+                            return
+                
+                final_key = keys[-1]
+                if isinstance(d, list) and final_key.startswith("[") and final_key.endswith("]"):
+                    d[int(final_key[1:-1])] = self.cast_to_correct_type(value, value_type)
+                elif isinstance(d, dict):
+                    found = False
+                    for k_orig in d.keys():
+                        if str(k_orig) == final_key:
+                            d[k_orig] = self.cast_to_correct_type(value, value_type)
+                            found = True
+                            break
+            
+            self.changes[tuple(keys)] = True
             set_value(self.cbor_data, keys, new_value)
-
+            
     def cast_to_correct_type(self, value, value_type):
         try:
             if value_type == 'int':
@@ -281,53 +309,42 @@ class CBORViewerApp(QMainWindow):
                 QMessageBox.information(self, "No Changes", "No user-made changes to save.")
                 return
 
-            # Open the original file data
-            with open(self.current_file_path, 'rb') as f:
-                original_file_data = f.read()
+            # Re-encode the entire modified CBOR data object
+            new_dump_data = cbor2.dumps(self.cbor_data)
+            
+            # Calculate the new size of the dump data
+            new_dump_size = len(new_dump_data)
+            new_dump_size_hex = f'{new_dump_size:08x}'.encode('ascii')
 
-            # Apply only the changes from self.changes dictionary
-            for keys, change in self.changes.items():
-                original_value = change["original"]
-                new_value = change["new"]
-                value_type = change["type"]
-
-                original_bytes = cbor2.dumps(original_value)
-                new_bytes = cbor2.dumps(self.cast_to_correct_type(new_value, value_type))
-
-                index = original_file_data.find(original_bytes)
-
-                if index != -1:
-                    original_file_data = original_file_data[:index] + new_bytes + original_file_data[index + len(original_bytes):]
-
-            # Update dump size (recalculate based on modified data)
-            new_cbor_data = original_file_data[26:-1]  # The new CBOR data section
-            new_dump_size = len(new_cbor_data)  # Calculate the new dump size based on CBOR section
-            new_dump_size_hex = f'{new_dump_size:08x}'.encode('ascii')  # Convert to hex and encode to ASCII
-
-            # Rebuild the original data with updated dump size
-            original_file_data = (
-                original_file_data[:8]  # Signature part
-                + new_dump_size_hex  # Updated dump size
-                + original_file_data[16:]  # Rest of the file
+            # Reconstruct the file with the new data and header
+            # Keep the original file's header parts and just replace what's needed
+            signature = self.original_data[:8]
+            header_part2 = self.original_data[16:26] # Separator1, ASCII Unk, Separator2
+            final_separator = self.original_data[-1:]
+            
+            new_file_data = (
+                signature
+                + new_dump_size_hex
+                + header_part2
+                + new_dump_data
+                + final_separator
             )
 
             # Write the updated data back to the file
             with open(self.current_file_path, 'wb') as f:
-                f.write(original_file_data)
+                f.write(new_file_data)
+            
+            # Reload data to reflect saved state
+            with open(self.current_file_path, 'rb') as f:
+                self.original_data = f.read()
 
+            self.changes = {} # Reset changes
             self.status_bar.showMessage("Changes saved successfully.", 5000)
             QMessageBox.information(self, "Success", "Data successfully saved to file.")
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save changes: {e}")
             self.status_bar.showMessage("Failed to save changes.", 5000)
-
-    def get_item_path(self, item):
-        """Retrieve the path of keys to the current item."""
-        keys = []
-        while item is not None:
-            keys.append(item.text(0))
-            item = item.parent()
-        return list(reversed(keys))
 
 def read_and_split_sav_file(file_path):
     with open(file_path, 'rb') as f:
@@ -379,33 +396,21 @@ def hex_ascii_display(data):
     return hex_dump, ascii_dump
 
 def make_human_readable(data):
-    readable_data = []
     if isinstance(data, bytes):
-        start = 0
-        while True:
-            start = data.find(b'\xff\xd8', start)
-            if start == -1:
-                break
-            end = data.find(b'\xff\xd9', start) + 2
-            if end == 1:
-                break
-            jpeg_data = data[start:end]
+        # Check for JPEG magic numbers
+        if data.startswith(b'\xff\xd8') and data.endswith(b'\xff\xd9'):
             try:
-                image = Image.open(io.BytesIO(jpeg_data))
-                pixmap = pil_image_to_qt_pixmap(image)
-                readable_data.append(pixmap)
-            except Exception as e:
-                readable_data.append(f"Image could not be displayed: {e}")
-            start = end
-        if not readable_data:
-            readable_data = binascii.hexlify(data).decode('utf-8')
+                image = Image.open(io.BytesIO(data))
+                return pil_image_to_qt_pixmap(image)
+            except Exception:
+                return f"Image data (size: {len(data)})" # Fallback for unreadable images
+        return binascii.hexlify(data).decode('utf-8')
     elif isinstance(data, list):
-        readable_data = [make_human_readable(item) for item in data]
+        return [make_human_readable(item) for item in data]
     elif isinstance(data, dict):
-        readable_data = {make_human_readable(key): make_human_readable(value) for key, value in data.items()}
+        return {make_human_readable(key): make_human_readable(value) for key, value in data.items()}
     else:
-        readable_data = data
-    return readable_data
+        return data
 
 def pil_image_to_qt_pixmap(image):
     if image.mode != "RGB":
